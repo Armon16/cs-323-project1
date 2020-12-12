@@ -1,28 +1,18 @@
-/* should not be able to read this */
+/*should not be able to read this*/
+
 $$
-  int num;
-  int max;
-  int sum;
+  int num1;
+  int num2;
+  int biggest;
 
-  boolean check;
-  check = true;
+  num1 = 0;
+  num2 = 10;
 
-  sum = 0;
-  num = 1;
-  get(max);
-
-  while(num < max) {
-    sum = sum + num;
-    num = num + 1;
-  }
-  sum = sum + max;
-  put(sum);
-
-  if(sum < max) {
-    sum = max + 1;
+  if (num1 > num2) {
+    biggest = num1;
   }
   else {
-    put(sum);
+    biggest = num2;
   }
   fi
 $$

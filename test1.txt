@@ -1,12 +1,14 @@
-/*should not be able to read this*/
-$$
-  int num;
-  int max;
+   /* this is comment for this sample code
+         for assignment 3  */
 
-  num = 0;
-  max = 20;
+    $$
+    int      i, max, sum;    /* declarations */
 
-  while(num < max) {
-      num = num + 1;
-  }
-$$
+    sum = 0;
+    i = 1;
+    while (i <  max)  {
+          sum = sum + i;
+          i  = i + 1;
+     }
+     put (sum + max);
+     $$

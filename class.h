@@ -90,19 +90,19 @@ public:
 };
 
 Reader OFD(std::ofstream& out, std::ifstream& source);
-Reader IDs(std::ofstream& out, std::ifstream& source, Reader latest);
-Reader IDs(std::ofstream& out, std::ifstream& source, Reader latest, bool make, std::string a);
-Reader IDs_Cont(std::ofstream& out, std::ifstream& source);
-Reader IDs_Cont(std::ofstream& out, std::ifstream& source, bool make, std::string a);
+Reader IDs_checker(std::ofstream& out, std::ifstream& source, Reader latest);
+Reader IDs_checker(std::ofstream& out, std::ifstream& source, Reader latest, bool make, std::string a);
+Reader Prepare_IDs(std::ofstream& out, std::ifstream& source);
+Reader Prepare_IDs(std::ofstream& out, std::ifstream& source, bool make, std::string a);
 Reader State_List(std::ofstream& out, std::ifstream& source, Reader latest);
 Reader Expression(std::ofstream& out, std::ifstream& source, Reader latest);
 Reader Parameter_List(std::ofstream& out, std::ifstream& source, Reader latest);
-Reader Declare_List(std::ofstream& out, std::ifstream& source, Reader latest);
-Reader Func_Def(std::ofstream& out, std::ifstream& source);
+Reader declartion_list(std::ofstream& out, std::ifstream& source, Reader latest);
+Reader function_definition(std::ofstream& out, std::ifstream& source);
 void Compound(std::ofstream& out, std::ifstream& source);
-void Statement(std::ofstream& out, std::ifstream& source, Reader latest);
+void Statement_reader_checker(std::ofstream& out, std::ifstream& source, Reader latest);
 void Assign(std::ofstream& out, std::ifstream& source, Reader latest);
-void If(std::ofstream& out, std::ifstream& source);
+void If_Statement(std::ofstream& out, std::ifstream& source);
 void Return(std::ofstream& out, std::ifstream& source);
 void If_Prime(std::ofstream& out, std::ifstream& source, Reader latest);
 void Return_Prime(std::ofstream& out, std::ifstream& source);

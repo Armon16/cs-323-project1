@@ -1,0 +1,30 @@
+Symbol Table:
+
+Identifier	MemoryLocation			Type
+	i						5000					identifier
+	max						5001					identifier
+	sum						5002					identifier
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+Assembly Code:
+1	PUSHI	0
+2	POPM	5002
+3	PUSHI	1
+4	POPM	5000
+5	LABEL	NULL
+6	PUSHM	5000
+7	PUSHM	5001
+8	LES	NULL
+8	JUMPZ	NULL
+9	PUSHM	18
+10	PUSHM	5000
+11	ADD	NULL
+12	POPM	5002
+13	PUSHM	5000
+14	PUSHI	1
+15	ADD	NULL
+16	POPM	5000
+17	JUMP	5
+18	PUSHM	5002
+19	PUSHM	5001
+20	ADD	NULL
+21	STDOUT	NULL

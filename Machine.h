@@ -10,21 +10,21 @@
 #include "class.h"
 #include "lexer.h"
 
-Reader Primary_prime(std::ofstream& out, std::ifstream& source) {
+Reader Prepare_primary(std::ofstream& out, std::ifstream& source) {
 	if (file){
-		out << "\t<Primary>' ::= ( <IDs> ) | <Empty>\n";
+		out << "\t<Primary>' ::= ( <IDs_checker> ) | <Empty>\n";
 	}
 
 	Reader latest = Lexer_call(out, source);
-	if (latest.getLexeme() != "(") {
+	if (latest.getLexeme() == "(") {
+		latest = IDs_checker(out, source, Lexer_call(out, source), false, "");
+	}
+
+	else {
 		return latest;
 	}
 
-	else{
-		latest = IDs(out, source, Lexer_call(out, source), false, "");
-	}
-
-	if (latest.getLexeme() != ")") {
+	if (latest.getLexeme() == ")") {
 		std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
 		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
@@ -44,20 +44,23 @@ Reader Primary(std::ofstream& out, std::ifstream& source, Reader latest) {
 		arithmetic_Table.push_back(latest);
 		token.push_back(instr(instr_address, "PUSHM", get_address(latest.getLexeme())));
 		instr_address++;
-		return Primary_prime(out, source);
+		return Prepare_primary(out, source);
 	}
 
 	else if (latest.getLexeme() == "(") {
 		latest = Expression(out, source, Lexer_call(out, source));
-		if (latest.getLexeme() != ")") {
-			std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
-			std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
-			exit(1);
-		}
-
-		else{
+		if (latest.getLexeme() == ")") {
 			return Lexer_call(out, source);
 		}
+
+		else {
+			std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
+			exit(1);
+		}
+	}
+
+	else if (latest.getToken() == "real"){
+		return Lexer_call(out, source);
 	}
 
 	else if (latest.getToken() == "int") {
@@ -67,18 +70,14 @@ Reader Primary(std::ofstream& out, std::ifstream& source, Reader latest) {
 		return Lexer_call(out, source);
 	}
 
-	else if (latest.getToken() == "real"){
-		return Lexer_call(out, source);
-	}
-
 	else if (latest.getLexeme() == "true" || latest.getLexeme() == "false") {
-		if (latest.getLexeme() == "true"){
-			token.push_back(instr(instr_address, "PUSHM", get_address(latest.getLexeme())));
+		if (latest.getLexeme() != "true"){
+			token.push_back(instr(instr_address, "PUSHM", "0"));
 			instr_address++;
 		}
 
 		else{
-			token.push_back(instr(instr_address, "PUSHM", "0"));
+			token.push_back(instr(instr_address, "PUSHM", get_address(latest.getLexeme())));
 			instr_address++;
 		}
 		return Lexer_call(out, source);
@@ -86,7 +85,6 @@ Reader Primary(std::ofstream& out, std::ifstream& source, Reader latest) {
 
 	else{
 		std::cerr << "Syntax Error: Expected " << "identifier or int or (or real or true or false)" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 }
@@ -105,7 +103,7 @@ Reader Factor(std::ofstream& out, std::ifstream& source, Reader latest) {
 	}
 }
 
-Reader Term_Prime(std::ofstream& out, std::ifstream& source, Reader latest) {
+Reader prepare_term(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
 		out << "\t<Term>' ::= * <Factor> <Term>' | / <Factor> <Term>' | <Empty>\n";
 	}
@@ -122,7 +120,7 @@ Reader Term_Prime(std::ofstream& out, std::ifstream& source, Reader latest) {
 			token.push_back(instr(instr_address, "DIV", "NULL"));
 			instr_address++;
 		}
-		return Term_Prime(out, source, latest);
+		return prepare_term(out, source, latest);
 	}
 
 	else{
@@ -135,17 +133,19 @@ Reader Term(std::ofstream& out, std::ifstream& source, Reader latest) {
 		out << "\t<Term> ::= <Factor> <Term>'\n";
 	}
 	latest = Factor(out, source, latest);
-	return Term_Prime(out, source, latest);
+	return prepare_term(out, source, latest);
 }
 
-Reader Expression_Prime(std::ofstream& out, std::ifstream& source, Reader latest) {
+Reader Prepare_Expression(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
 		out << "\t<Expression>' ::= + <Term> <Expression>' | - <Term> <Expression>' | <Empty>\n";
 	}
 	std::string save = latest.getLexeme();
 	if (latest.getLexeme() == "+" || latest.getLexeme() == "-") {
+
 		latest = Term(out, source, Lexer_call(out, source));
 		arithmetic_Check();
+
 		if (save == "+") {
 			token.push_back(instr(instr_address, "ADD", "NULL"));
 			instr_address++;
@@ -153,12 +153,12 @@ Reader Expression_Prime(std::ofstream& out, std::ifstream& source, Reader latest
 
 		else if (save == "-"){
 			token.push_back(instr(instr_address, "SUB", "NULL"));
-		 instr_address++;
+		  instr_address++;
 		}
 
-		return Expression_Prime(out, source, latest);
+		return Prepare_Expression(out, source, latest);
 	}
-	else{
+	else {
 		return latest;
 	}
 }
@@ -168,8 +168,9 @@ Reader Expression(std::ofstream& out, std::ifstream& source, Reader latest) {
 		out << "\t<Expression> ::= <Term> <Expression>'\n";
 	}
 	latest = Term(out, source, latest);
-	return Expression_Prime(out, source, latest);
+	return Prepare_Expression(out, source, latest);
 }
+
 
 void Relop(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
@@ -181,49 +182,19 @@ void Relop(std::ofstream& out, std::ifstream& source, Reader latest) {
 	}
 }
 
-Reader Condition(std::ofstream& out, std::ifstream& source) {
+Reader Set_conditions(std::ofstream& out, std::ifstream& source) {
 	if (file){
 		out << "\t<Condition> ::= <Expression> <Relop> <Expression>\n";
 	}
+
 	Reader latest = Expression(out, source, Lexer_call(out, source));
 	Relop(out, source, latest);
 	Reader save = Expression(out, source, Lexer_call(out, source));
-	if (latest.getLexeme() == "<") {
-		token.push_back(instr(instr_address, "LES", "NULL"));
-		instr_address++;
-		push_stack(instr_address - 1);
-		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
-		instr_address++;
-	}
 
-	else if (latest.getLexeme() == "<=") {
-		token.push_back(instr(instr_address, "LES", "NULL"));
-		instr_address++;
-		push_stack(instr_address - 1);
-		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
-		instr_address++;
-	}
-
-	else if (latest.getLexeme() == ">") {
-		token.push_back(instr(instr_address, "GRT", "NULL"));
-		instr_address++;
-		push_stack(instr_address - 1);
-		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
-		instr_address++;
-	}
-
-	else if (latest.getLexeme() == ">=") {
-		token.push_back(instr(instr_address, "GRT", "NULL"));
-		instr_address++;
-		push_stack(instr_address - 1);
-		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
-		instr_address++;
-	}
-
-	else if (latest.getLexeme() == "==") {
+	if (latest.getLexeme() == "==") {
 		token.push_back(instr(instr_address, "EQU", "NULL"));
 		instr_address++;
-		push_stack(instr_address - 1);
+		push_stack(instr_address--);
 		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
 		instr_address++;
 	}
@@ -231,29 +202,62 @@ Reader Condition(std::ofstream& out, std::ifstream& source) {
 	else if (latest.getLexeme() == "!=") {
 		token.push_back(instr(instr_address, "NEQ", "NULL"));
 		instr_address++;
-		push_stack(instr_address - 1);
+		push_stack(instr_address--);
+		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
+		instr_address++;
+	}
+
+	else if (latest.getLexeme() == "<") {
+		token.push_back(instr(instr_address, "LES", "NULL"));
+		instr_address++;
+		push_stack(instr_address--);
+		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
+		instr_address++;
+	}
+
+	else if (latest.getLexeme() == "<=") {
+		token.push_back(instr(instr_address, "LES", "NULL"));
+		instr_address++;
+		push_stack(instr_address--);
+		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
+		instr_address++;
+	}
+
+	else if (latest.getLexeme() == ">") {
+		token.push_back(instr(instr_address, "GRT", "NULL"));
+		instr_address++;
+		push_stack(instr_address--);
+		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
+		instr_address++;
+	}
+
+	else if (latest.getLexeme() == ">=") {
+		token.push_back(instr(instr_address, "GRT", "NULL"));
+		instr_address++;
+		push_stack(instr_address--);
 		token.push_back(instr(instr_address, "JUMPZ", "NULL"));
 		instr_address++;
 	}
 
 	return save;
+
 }
 
-void While(std::ofstream& out, std::ifstream& source) {
+void While_statement(std::ofstream& out, std::ifstream& source) {
 	if (file){
-		out << "\t<While> ::= while ( <Condition> ) <Statement>\n";
+		out << "\t<While_statement> ::= while ( <Set_conditions> ) <Statement_reader_checker>\n";
 	}
 	std::string addr = std::to_string(instr_address);
 	token.push_back(instr(instr_address, "LABEL", "NULL"));
 	instr_address++;
 	Lexeme_Check(out, source, "(");
-	Reader latest = Condition(out, source);
+	Reader latest = Set_conditions(out, source);
+
 	if (latest.getLexeme() != ")") {
-		std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
+		std::cerr << "Error: Expected " << ")" << " on line " << line << "\n";
 		exit(1);
 	}
-	Statement(out, source, Lexer_call(out, source));
+	Statement_reader_checker(out, source, Lexer_call(out, source));
 	token.push_back(instr(instr_address, "JUMP", addr));
 	instr_address++;
 	int addr1 = pop_stack();
@@ -261,20 +265,19 @@ void While(std::ofstream& out, std::ifstream& source) {
 	return;
 }
 
-void Scan(std::ofstream& out, std::ifstream& source) {
+void Read_files_through(std::ofstream& out, std::ifstream& source) {
 	if (file){
-		out << "\t<Scan> ::= get ( <IDs> );\n";
+		out << "\t<Read_files_through> ::= get ( <IDs_checker> );\n";
 	}
 
 	Lexeme_Check(out, source, "(");
 	Reader latest = Lexer_call(out, source);
 	if (file){
-		out << "\t<IDs> ::= <Identifier> <IDs>'\n";
+		out << "\t<IDs_checker> ::= <Identifier> <IDs_checker>'\n";
 	}
 
 	if (latest.getToken() != "identifier"){
 		std::cerr << "Syntax Error: Expected " << "an identifier" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 
 	while (latest.getToken() == "identifier" || latest.getLexeme() == ",") {
@@ -305,8 +308,7 @@ void Print(std::ofstream& out, std::ifstream& source) {
 	Lexeme_Check(out, source, "(");
 	Reader latest = Expression(out, source, Lexer_call(out, source));
 	if (latest.getLexeme() != ")") {
-		std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
+		std::cerr << "Error: Expected " << ")" << " on line " << line << "\n";
 		exit(1);
 	}
 	token.push_back(instr(instr_address, "STDOUT", "NULL"));
@@ -315,13 +317,13 @@ void Print(std::ofstream& out, std::ifstream& source) {
 
 }
 
-Reader IDs_Cont(std::ofstream& out, std::ifstream& source) {
+Reader Prepare_IDs(std::ofstream& out, std::ifstream& source) {
 	if (file){
-		out << "\t<IDs>' ::= ,  <IDs>  |  <Empty>'\n";
+		out << "\t<IDs_checker>' ::= ,  <IDs_checker>  |  <Empty>'\n";
 	}
 	Reader latest = Lexer_call(out, source);
 	if (latest.getLexeme() == ","){
-		return IDs(out, source, Lexer_call(out, source));
+		return IDs_checker(out, source, Lexer_call(out, source));
 	}
 
 	else{
@@ -329,13 +331,13 @@ Reader IDs_Cont(std::ofstream& out, std::ifstream& source) {
 	}
 }
 
-Reader IDs_Cont(std::ofstream& out, std::ifstream& source, bool make, std::string a) {
+Reader Prepare_IDs(std::ofstream& out, std::ifstream& source, bool make, std::string a) {
 	if (file){
-		out << "\t<IDs>' ::= ,  <IDs>  |  <Empty>'\n";
+		out << "\t<IDs_checker>' ::= ,  <IDs_checker>  |  <Empty>'\n";
 	}
 	Reader latest = Lexer_call(out, source);
 	if (latest.getLexeme() == ","){
-		return IDs(out, source, Lexer_call(out, source), make, a);
+		return IDs_checker(out, source, Lexer_call(out, source), make, a);
 	}
 
 	else{
@@ -343,14 +345,13 @@ Reader IDs_Cont(std::ofstream& out, std::ifstream& source, bool make, std::strin
 	}
 }
 
-Reader IDs(std::ofstream& out, std::ifstream& source, Reader latest, bool make, std::string a) {
+Reader IDs_checker(std::ofstream& out, std::ifstream& source, Reader latest, bool make, std::string a) {
 	if (file){
-		out << "\t<IDs> ::= <Identifier> <IDs>'\n";
+		out << "\t<IDs_checker> ::= <Identifier> <IDs_checker>'\n";
 	}
 
 	if (latest.getToken() != "identifier"){
-		std::cerr << "Syntax Error: Expected " << "an identifier" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
+		std::cerr << "Error: Expected " << "an identifier" << " on line " << line << "\n";
 		exit(1);
 	}
 
@@ -366,78 +367,100 @@ Reader IDs(std::ofstream& out, std::ifstream& source, Reader latest, bool make, 
 		token.push_back(instr(instr_address, "PUSHM", get_address(latest.getLexeme())));
 		instr_address++;
 	}
-	return IDs_Cont(out, source, make, a);
+
+	return Prepare_IDs(out, source, make, a);
 }
 
-Reader IDs(std::ofstream& out, std::ifstream& source, Reader latest) {
-	if (file){
-		out << "\t<IDs> ::= <Identifier> <IDs>'\n";
+Reader IDs_checker(std::ofstream& out, std::ifstream& source, Reader latest) {
+	if (file) {
+		out << "\t<IDs_checker> ::= <Identifier> <IDs_checker>'\n";
 	}
 
 	if (latest.getToken() != "identifier"){
 		std::cerr << "Syntax Error: Expected " << "an identifier" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
-	return IDs_Cont(out, source);
+	return Prepare_IDs(out, source);
 }
 
-void Body(std::ofstream& out, std::ifstream& source, Reader latest) {
+void statement_Body_checker(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
-		out << "\t<Body> ::= { < Statement List> }\n";
+		out << "\t<statement_Body_checker> ::= { < Statement_reader_checker List> }\n";
 	}
 
 	if (latest.getLexeme() != "{") {
 		std::cerr << "Syntax Error: Expected " << "{" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 	latest = Lexer_call(out, source);
 	latest = State_List(out, source, latest);
 	if (latest.getLexeme() != "}") {
 		std::cerr << "Syntax Error: Expected " << "}" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 }
 
-void Qualifier(std::ofstream& out, std::ifstream& source, Reader latest) {
+void Statement_Qualifier_checker(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
-		out << "\t<Qualifier> ::= int | boolean | real\n";
+		out << "\t<Statement_Qualifier_checker> ::= real | int | bool\n";
 	}
 
-	if (latest.getLexeme() == "int" || latest.getLexeme() == "boolean" || latest.getLexeme() == "real"){
+	if (latest.getLexeme() == "real" || latest.getLexeme() == "int" || latest.getLexeme() == "boolean"){
 		return;
 	}
 
 	else{
-		std::cerr << "Syntax Error: Expected " << "int, boolean, or real" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
+		std::cerr << "Syntax Error: Expected " << "real, int, or bool" << " on line " << line << "\n";
 		exit(1);
 	}
 }
 
-void Parameter(std::ofstream& out, std::ifstream& source, Reader a) {
+Reader declaration(std::ofstream& out, std::ifstream& source, Reader a) {
 	if (file){
-		out << "\t<Parameter> ::= <IDs> <Qualifier>\n";
+		out << "\t<Read_Parameter> ::= <Statement_Qualifier_checker> <IDs_checker>\n";
 	}
-	Reader latest = IDs(out, source, a);
-	Qualifier(out, source, latest);
-}
-
-Reader Decla(std::ofstream& out, std::ifstream& source, Reader a) {
-	if (file){
-		out << "\t<Parameter> ::= <Qualifier> <IDs>\n";
-	}
-	Qualifier(out, source, a);
+	Statement_Qualifier_checker(out, source, a);
 	Reader latest = Lexer_call(out, source);
 
-	return IDs(out, source, latest, true, a.getLexeme());
+	return IDs_checker(out, source, latest, true, a.getLexeme());
 }
 
-Reader Parameter_List_Cont(std::ofstream& out, std::ifstream& source) {
+void Read_Parameter(std::ofstream& out, std::ifstream& source, Reader a) {
 	if (file){
-		out << "\t<Parameter List>\' ::= ,  <Parameter List>  |  <Empty>\n";
+		out << "\t<Read_Parameter> ::= <IDs_checker> <Statement_Qualifier_checker>\n";
+	}
+	Reader latest = IDs_checker(out, source, a);
+	Statement_Qualifier_checker(out, source, latest);
+}
+
+Reader prepare_declartion_list(std::ofstream& out, std::ifstream& source, Reader latest) {
+	if (file){
+		out << "\t<Declaration List>\' ::= <Declaration List>  |  <Empty>\n";
+	}
+	if (latest.getLexeme() == "int" || latest.getLexeme() == "boolean" || latest.getLexeme() == "real"){
+		return declartion_list(out, source, latest);
+	}
+	else{
+		return latest;
+	}
+}
+
+Reader declartion_list(std::ofstream& out, std::ifstream& source, Reader latest) {
+	if (file){
+		out << "\t<Declaration List> ::= <Declaration> ; <Declaration List>\'\n";
+	}
+	Reader l = declaration(out, source, latest);
+	if (l.getLexeme() != ";"){
+		std::cerr << "Syntax Error: Expected " << ";" << " on line " << line << "\n";
+		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
+		exit(1);
+	}
+	return prepare_declartion_list(out, source, Lexer_call(out, source));
+}
+
+Reader prepare_Parameter_list(std::ofstream& out, std::ifstream& source) {
+	if (file){
+		out << "\t<Read_Parameter List>\' ::= ,  <Read_Parameter List>  |  <Empty>\n";
 	}
 	Reader latest = Lexer_call(out, source);
 	if (latest.getLexeme() == ","){
@@ -450,154 +473,132 @@ Reader Parameter_List_Cont(std::ofstream& out, std::ifstream& source) {
 
 Reader Parameter_List(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
-		out << "\t<Parameter List> ::= <Parameter> <Parameter List>'\n";
+		out << "\t<Read_Parameter List> ::= <Read_Parameter> <Read_Parameter List>'\n";
 	}
-	Parameter(out, source, latest);
-	return Parameter_List_Cont(out, source);
+	Read_Parameter(out, source, latest);
+	return prepare_Parameter_list(out, source);
 }
 
-Reader Declare_List_Cont(std::ofstream& out, std::ifstream& source, Reader latest) {
+Reader prepare_state_list(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
-		out << "\t<Declaration List>\' ::= <Declaration List>  |  <Empty>\n";
-	}
-	if (latest.getLexeme() == "int" || latest.getLexeme() == "boolean" || latest.getLexeme() == "real"){
-		return Declare_List(out, source, latest);
-	}
-	else{
-		return latest;
-	}
-}
-
-Reader Declare_List(std::ofstream& out, std::ifstream& source, Reader latest) {
-	if (file){
-		out << "\t<Declaration List> ::= <Declaration> ; <Declaration List>\'\n";
-	}
-	Reader l = Decla(out, source, latest);
-	if (l.getLexeme() != ";"){
-		std::cerr << "Syntax Error: Expected " << ";" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
-		exit(1);
-	}
-	return Declare_List_Cont(out, source, Lexer_call(out, source));
-}
-
-Reader State_List_Cont(std::ofstream& out, std::ifstream& source, Reader latest) {
-	if (file){
-		out << "\t<Statement List>\' ::= <Statement List>  |  <Empty>\n";
+		out << "\t<Statement_reader_checker List>\' ::= <Statement_reader_checker List>  |  <Empty>\n";
 	}
 
-	if (latest.getLexeme() == "{") {
+	if (latest.getToken() == "identifier") {
 		return State_List(out, source, latest);
 	}
-
-	else if (latest.getToken() == "identifier"){
+	else if (latest.getLexeme() == "{") {
 		return State_List(out, source, latest);
 	}
-
 	else if (latest.getLexeme() == "if") {
 		return State_List(out, source, latest);
 	}
-
 	else if (latest.getLexeme() == "return") {
 		return State_List(out, source, latest);
 	}
-
-	else if (latest.getLexeme() == "put") {
-		return State_List(out, source, latest);
-	}
-
 	else if (latest.getLexeme() == "get") {
 		return State_List(out, source, latest);
 	}
-
 	else if (latest.getLexeme() == "while") {
 		return State_List(out, source, latest);
 	}
-
-	else{
+	else if (latest.getLexeme() == "put") {
+		return State_List(out, source, latest);
+	}
+	else {
 		return latest;
 	}
 }
 
 Reader State_List(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
-		out << "\t<Statement List> ::= <Statement> <Statement List>\'\n";
+		out << "\t<Statement_reader_checker List> ::= <Statement_reader_checker> <Statement_reader_checker List>\'\n";
 	}
-	Statement(out, source, latest);
-	return State_List_Cont(out, source, Lexer_call(out, source));
+	Statement_reader_checker(out, source, latest);
+
+	return prepare_state_list(out, source, Lexer_call(out, source));
 }
 
 Reader OPL(std::ofstream& out, std::ifstream& source) {
-	if (file){
-		out << "\t<Opt Parameter List> ::= <Parameter List> | <Empty>\n";
+	if (file) {
+		out << "\t<Opt Read_Parameter List> ::= <Read_Parameter List> | <Empty>\n";
 	}
 	Reader latest = Lexer_call(out, source);
-	if (latest.getToken() != "identifier") {
-		return latest;
-	}
-	return Parameter_List(out, source, latest);
 
+	if (latest.getToken() == "identifier") {
+		return Parameter_List(out, source, latest);
+	}
+
+	return latest;
 }
 
-Reader ODL(std::ofstream& out, std::ifstream& source) {
+Reader Opt_Declaration_List(std::ofstream& out, std::ifstream& source) {
 	if (file){
 		out << "\t<Opt Declaration List> ::= <Declaration List> | <Empty>\n";
 	}
+
 	Reader latest = Lexer_call(out, source);
-	if (latest.getLexeme() == "int" || latest.getLexeme() == "boolean" || latest.getLexeme() == "real") {
-		return Declare_List(out, source, latest);
+	if (latest.getLexeme() == "int") {
+		return declartion_list(out, source, latest);
 	}
 
-	else{
+	else if (latest.getLexeme() == "boolean") {
+		return declartion_list(out, source, latest);
+	}
+
+	else if (latest.getLexeme() == "real") {
+		return declartion_list(out, source, latest);
+	}
+
+	else {
 		return latest;
 	}
 
 }
 
-void Func(std::ofstream& out, std::ifstream& source) {
+void Function_checker(std::ofstream& out, std::ifstream& source) {
 	if (file){
-		out << "\t<Function> ::= function <Identifier> ( <Opt Parameter List> ) <Opt Declaration List> <Body>\n";
+		out << "\t<Function> ::= function <Identifier> ( <Opt Read_Parameter List> ) <Opt Declaration List> <statement_Body_checker>\n";
 	}
 
 	Reader latest = Lexer_call(out, source);
-	latest = IDs(out, source, latest);
+	latest = IDs_checker(out, source, latest);
 
 	if (latest.getLexeme() != "(") {
 		std::cerr << "Syntax Error: Expected " << "(" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
+		exit(1);
+	}
+	if (latest.getLexeme() != ")") {
+		std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
 		exit(1);
 	}
 	latest = OPL(out, source);
-	if (latest.getLexeme() != ")") {
-		std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
-		exit(1);
-	}
-	latest = ODL(out, source);
-	Body(out, source, latest);
-
+	latest = Opt_Declaration_List(out, source);
+	statement_Body_checker(out, source, latest);
 }
 
-Reader Func_Def_Cont(std::ofstream& out, std::ifstream& source) {
-	if (file){
+Reader prepare_function_definition(std::ofstream& out, std::ifstream& source) {
+	if (file) {
 		out << "\t<Function Definitions>' ::= <Function Definitions> | <Empty>\n";
 	}
+
 	Reader latest = Lexer_call(out, source);
-	if (latest.getLexeme() != "function") {
-		return latest;
+
+	if (latest.getLexeme() == "function") {
+		return function_definition(out, source);
 	}
 
-	else{
-		return Func_Def(out, source);
+	else {
+		return latest;
 	}
 }
 
-Reader Func_Def(std::ofstream& out, std::ifstream& source) {
+Reader function_definition(std::ofstream& out, std::ifstream& source) {
 	if (file){
 		out << "\t<Function Definitions> ::= <Function> <Function Definitions>'\n";
 	}
-	Func(out, source);
-	return Func_Def_Cont(out, source);
+	Function_checker(out, source);
+	return prepare_function_definition(out, source);
 }
 
 Reader OFD(std::ofstream& out, std::ifstream& source) {
@@ -606,52 +607,49 @@ Reader OFD(std::ofstream& out, std::ifstream& source) {
 		out << "\t<Opt Function Definitions> ::= <Function Definitions> | <Empty>\n";
 	}
 	Reader latest = Lexer_call(out, source);
-	if (latest.getLexeme() != "function") {
-		return latest;
+	if (latest.getLexeme() == "function") {
+		return function_definition(out, source);
 	}
-
 	else{
-		return Func_Def(out, source);
+		return latest;
 	}
 }
 
-void Statement(std::ofstream& out, std::ifstream& source, Reader latest) {
+void Statement_reader_checker(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
-		out << "\t<Statement ::= <Compound> | <Assign> | <If> | <Return> | <Print> | <Scan> | <While>\n";
+		out << "\t<Statement_reader_checker ::= <Assign> | <Compound> | <If> | <While_statement> | <Print> | <Read_files_through> | <Return>\n";
 	}
 
-	if (latest.getLexeme() == "{") {
-		Compound(out, source);
-	}
-
-	else if (latest.getToken() == "identifier"){
+  if (latest.getToken() == "identifier"){
 		Assign(out, source, latest);
 	}
 
+	else if (latest.getLexeme() == "{") {
+		Compound(out, source);
+	}
+
 	else if (latest.getLexeme() == "if") {
-		If(out, source);
+		If_Statement(out, source);
+	}
+
+	else if (latest.getLexeme() == "while") {
+		While_statement(out, source);
+	}
+
+	else if (latest.getLexeme() == "put") {
+		Print(out, source);
+	}
+
+	else if (latest.getLexeme() == "get") {
+		Read_files_through(out, source);
 	}
 
 	else if (latest.getLexeme() == "return") {
 		Return(out, source);
 	}
 
-	else if (latest.getLexeme() == "put") {
-		Print(out, source);
-
-	}
-
-	else if (latest.getLexeme() == "get") {
-		Scan(out, source);
-	}
-
-	else if (latest.getLexeme() == "while") {
-		While(out, source);
-	}
-
 	else{
 		std::cerr << "Syntax Error: Expected " << "{ or identifier or if or return or put or get or while" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 
@@ -659,12 +657,11 @@ void Statement(std::ofstream& out, std::ifstream& source, Reader latest) {
 
 void Compound(std::ofstream& out, std::ifstream& source) {
 	if (file){
-		out << "\t<Compound> ::= { <Statement List> }\n";
+		out << "\t<Compound> ::= { <Statement_reader_checker List> }\n";
 	}
 	Reader latest = State_List(out, source, Lexer_call(out, source));
 	if (latest.getLexeme() != "}"){
 		std::cerr << "Syntax Error: Expected " << "}" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 }
@@ -675,34 +672,36 @@ void Assign(std::ofstream& out, std::ifstream& source, Reader latest) {
 	}
 
 	std::string save = latest.getLexeme();
-
 	Lexeme_Check(out, source, "=");
 
 	latest = Expression(out, source, Lexer_call(out, source));
 	token.push_back(instr(instr_address, "POPM", get_address(save)));
 	instr_address++;
+
 	if (latest.getLexeme() != ";"){
 		std::cerr << "Syntax Error: Expected " << ";" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
+
 }
 
-void If(std::ofstream& out, std::ifstream& source) {
-	if (file){
-		out << "\t<If> ::= if ( <Condition> ) <Statement> <If>'\n";
+void If_Statement(std::ofstream& out, std::ifstream& source) {
+	if (file) {
+		out << "\t<If> ::= if ( <Set_conditions> ) <Statement_reader_checker> <If>'\n";
 	}
+
 	Lexeme_Check(out, source, "(");
-	Reader latest = Condition(out, source);
+	Reader latest = Set_conditions(out, source);
+
 	if (latest.getLexeme() != ")"){
 		std::cerr << "Syntax Error: Expected " << ")" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 
-	Statement(out, source, Lexer_call(out, source));
+	Statement_reader_checker(out, source, Lexer_call(out, source));
 	int addr = instr_address;
 	int addr1 = pop_stack();
+
 	token[addr1].setOprnd(std::to_string(addr));
 	If_Prime(out, source, Lexer_call(out, source));
 	token.push_back(instr(instr_address, "LABEL", ""));
@@ -712,15 +711,15 @@ void If(std::ofstream& out, std::ifstream& source) {
 
 void If_Prime(std::ofstream& out, std::ifstream& source, Reader latest) {
 	if (file){
-		out << "\t<If>' ::= fi | else <Statement> fi\n";
+		out << "\t<If>' ::= fi | else <Statement_reader_checker> fi\n";
 	}
 
-	if (latest.getLexeme() == "fi"){
+	if (latest.getLexeme() == "fi") {
 		return;
 	}
 
 	else if (latest.getLexeme() == "else") {
-		Statement(out, source, Lexer_call(out, source));
+		Statement_reader_checker(out, source, Lexer_call(out, source));
 		Lexeme_Check(out, source, "fi");
 	}
 }
@@ -734,20 +733,22 @@ void Return(std::ofstream& out, std::ifstream& source) {
 }
 
 void Return_Prime(std::ofstream& out, std::ifstream& source) {
-	if (file){
+	if (file) {
 		out << "\t<Return>' ::= ; | <Expression>;\n";
 	}
+
 	Reader latest = Lexer_call(out, source);
-	if (latest.getLexeme() == ";"){
-		return;
-	}
-	else{
+
+	if (latest.getLexeme() != ";"){
 		latest = Expression(out, source, latest);
+	}
+
+	else {
+		return;
 	}
 
 	if (latest.getLexeme() != ";") {
 		std::cerr << "Syntax Error: Expected " << ";" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 
@@ -757,17 +758,17 @@ void Rat20F(std::ofstream& out, std::ifstream& source);
 
 void Rat20F(std::ofstream& out, std::ifstream& source) {
 	if (file){
-		out << "\t<Rat20F> ::= $$ <Opt Declaration List> <Statement List> $$\n";
+		out << "\t<Rat20F> ::= $$ <Opt Declaration List> <Statement_reader_checker List> $$\n";
 	}
 
 	Lexeme_Check(out, source, "$$");
 
-	Reader latest = ODL(out, source);
+	Reader latest = Opt_Declaration_List(out, source);
 
 	latest = State_List(out, source, latest);
+	
 	if (latest.getLexeme() != "$$"){
 		std::cerr << "Syntax Error: Expected " << "$$" << " on line " << line << "\n";
-		std::cerr << "Received " << latest.getToken() << " \"" << latest.getLexeme() << "\"\n";
 		exit(1);
 	}
 
