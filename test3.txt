@@ -1,0 +1,28 @@
+/* should not be able to read this */
+$$
+  int num;
+  int max;
+  int sum;
+
+  boolean check;
+  check = true;
+
+  sum = 0;
+  num = 1;
+  get(max);
+
+  while(num < max) {
+    sum = sum + num;
+    num = num + 1;
+  }
+  sum = sum + max;
+  put(sum);
+
+  if(sum < max) {
+    sum = max + 1;
+  }
+  else {
+    put(sum);
+  }
+  fi
+$$

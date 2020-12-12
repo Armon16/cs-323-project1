@@ -1,0 +1,18 @@
+/*should not be able to read this*/
+
+$$
+  int num1;
+  int num2;
+  int biggest;
+
+  num1 = 0;
+  num2 = 10;
+
+  if (num1 > num2) {
+    biggest = num1;
+  }
+  else {
+    biggest = num2;
+  }
+  fi
+$$

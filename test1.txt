@@ -1,0 +1,12 @@
+/*should not be able to read this*/
+$$
+  int num;
+  int max;
+
+  num = 0;
+  max = 20;
+
+  while(num < max) {
+      num = num + 1;
+  }
+$$
